@@ -6,13 +6,68 @@
 import { DEBUG } from "../config/constants.js";
 
 /**
- * Logs debug messages only when DEBUG is enabled
- * @param {...any} args - Arguments to pass to console.log
+ * Logs debug or error messages with a timestamp and error prefix if needed.
+ * @param {...any} args - Arguments to pass to console.log or console.error.
  */
 export function debugLog(...args) {
+  const now = new Date();
+  const utcDate = new Date(now.getTime()); // Create a copy for UTC manipulation
+  const timezoneOffset = now.getTimezoneOffset() * 60000; // Offset in milliseconds
+  const localTimestamp = new Date(utcDate.getTime() - timezoneOffset);
+
+  const timestamp = localTimestamp.toISOString().replace("T", " ").slice(0, 23);
+  const basePrefix = `[${timestamp}][Now2.ai RTL Fixer Debug]`;
+  const errorPrefix = `[${timestamp}][❌ Now2.ai RTL Fixer Error]`;
+
   if (DEBUG) {
-    console.log("[RTL Fixer Debug]", ...args);
+    let isError = false;
+    for (const arg of args) {
+      if (
+        arg instanceof Error ||
+        (typeof arg === "string" && arg.toLowerCase().includes("error"))
+      ) {
+        isError = true;
+        break;
+      } else if (
+        typeof arg === "object" &&
+        arg !== null &&
+        arg.message &&
+        typeof arg.message === "string" &&
+        arg.stack
+      ) {
+        isError = true;
+        break;
+      }
+    }
+
+    // Format each argument
+    const formattedArgs = args.map(formatDebugArgument);
+
+    if (isError) {
+      console.log(errorPrefix, ...formattedArgs);
+    } else {
+      console.log(basePrefix, ...formattedArgs);
+    }
   }
+}
+
+/**
+ * Formats an argument for debug logging
+ * @param {any} arg - Argument to format
+ * @returns {any} Formatted argument
+ */
+function formatDebugArgument(arg) {
+  if (typeof arg === "object" && arg !== null && !(arg instanceof Error)) {
+    try {
+      // Only convert simple objects, not DOM elements, errors, etc.
+      if (arg.constructor === Object || Array.isArray(arg)) {
+        return JSON.stringify(arg);
+      }
+    } catch (e) {
+      // If serialization fails, return the original object
+    }
+  }
+  return arg;
 }
 
 /**
@@ -115,11 +170,11 @@ export function safeAddEventListener(element, event, handler, options = {}) {
       try {
         element.removeEventListener(event, handler, options);
       } catch (error) {
-        console.error("Error removing event listener:", error);
+        debugLog("Error removing event listener:", error);
       }
     };
   } catch (error) {
-    console.error("Error adding event listener:", error);
+    debugLog("Error adding event listener:", error);
     return () => {}; // Return no-op cleanup function
   }
 }
@@ -150,4 +205,42 @@ export function getEffectiveDirection(element) {
   }
 
   return "ltr";
+}
+
+/**
+ * Creates a simple hash of a string
+ * @param {string} str - String to hash
+ * @returns {string} Hash value as hex string
+ */
+export async function hashString(str) {
+  // Use the SubtleCrypto API which is available in modern browsers
+  try {
+    // Convert string to buffer
+    const msgBuffer = new TextEncoder().encode(str);
+
+    // Hash the buffer
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+
+    // Convert hash to hex string
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    return hashHex;
+  } catch (error) {
+    debugLog("Error creating hash:", error);
+
+    // Fallback to a simple hash function if SubtleCrypto is unavailable
+    let hash = 0;
+    if (str.length === 0) return hash.toString(16);
+
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+
+    return Math.abs(hash).toString(16);
+  }
 }

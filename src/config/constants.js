@@ -2,6 +2,8 @@
  * @fileoverview Core constants for the RTL Fixer extension
  * Defines brand information, versioning, and CSS rules for RTL text handling
  */
+import { debugLog } from "../utils/utils.js";
+import stylesConfig from "./json/styles_config.json";
 
 /**
  * @const {boolean} Environment specific settings
@@ -40,32 +42,4 @@ export const NAMESPACE = `${BRAND}-${Math.random().toString(36).substr(2, 9)}`;
  * - rtl-inherit: Inherit RTL handling from parent elements
  * - rtl-force: Force RTL direction regardless of content
  */
-export const CSS_CLASSES = {
-  "rtl-auto": {
-    cssRules: {
-      "unicode-bidi": "isolate !important",
-      direction: "auto !important",
-      dir: "auto",
-    },
-  },
-  "rtl-inherit": {
-    cssRules: {
-      "unicode-bidi": "isolate !important",
-      direction: "inherit !important",
-      dir: "auto",
-    },
-  },
-  "rtl-force": {
-    cssRules: {
-      "unicode-bidi": "isolate !important",
-      direction: "rtl !important",
-      dir: "rtl",
-    },
-  },
-  "ltr-force": {
-    cssRules: {
-      direction: "ltr !important",
-      dir: "ltr",
-    },
-  },
-};
+export const CSS_CLASSES = stylesConfig;

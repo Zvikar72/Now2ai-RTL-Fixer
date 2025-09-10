@@ -2,12 +2,12 @@
  * @fileoverview Domain configurations for the RTL Fixer extension
  * Defines supported platforms and their specific layout requirements
  */
+import { debugLog } from "../utils/utils.js";
+import { getConfigFromBackground } from "../utils/config-utils.js";
 
-import {
-  DEFAULT_SELECTORS,
-  createElementSelector,
-  getClassesForElement,
-} from "./selectors.js";
+// Cache for domain config to avoid repeated background requests
+let cachedDomainsConfig = null;
+let cachedDefaultsConfig = null;
 
 /**
  * @typedef {Object} Position
@@ -19,17 +19,6 @@ import {
  */
 
 /**
- * Default position configuration for the indicator
- * Used as the base for all domain-specific positions
- * @type {Position}
- */
-export const DEFAULT_POSITION = {
-  bottom: "16px",
-  right: "66px",
-  padding: "8px 12px",
-};
-
-/**
  * @typedef {Object} DomainConfig
  * @property {string} domain - Regular expression pattern matching the domain
  * @property {Position} position - Position configuration for the indicator
@@ -37,174 +26,121 @@ export const DEFAULT_POSITION = {
  */
 
 /**
- * @const {DomainConfig[]}
- * Comprehensive domain configurations including pattern, position, and selectors
- * Each domain includes domain-specific settings for the RTL Fixer extension
+ * Gets the default position configuration
+ * @returns {Promise<Position>} Default position configuration
  */
-export const SUPPORTED_DOMAINS = [
-  {
-    domain: "^(?:[^.]+\\.)?claude\\.ai$",
-    position: {
-      top: "9px",
-      right: "146px",
-      padding: DEFAULT_POSITION.padding,
-    },
-    selectors: {
-      attributes: [
-        { selector: "contenteditable", classes: ["rtl-auto"] },
-        { selector: "data-is-streaming", classes: ["rtl-auto"] },
-      ],
-      tags: [{ selector: "textarea", classes: ["rtl-auto"] }],
-      classes: [
-        { selector: "font-claude-message", classes: ["rtl-auto"] },
-        { selector: "grid", classes: ["rtl-auto"] },
-        { selector: "flex", classes: ["rtl-auto"] },
-        { selector: "textarea", classes: ["rtl-auto"] },
-      ],
-    },
-  },
-  {
-    domain: "^notebooklm\\.google\\.com$",
-    position: {
-      top: "12px",
-      right: "420px",
-      padding: DEFAULT_POSITION.padding,
-    },
-    selectors: {
-      attributes: [],
-      tags: [
-        { selector: "textarea", classes: ["rtl-auto"] },
-        { selector: "chat-message", classes: ["rtl-auto"] },
-        { selector: "mat-card", classes: ["rtl-auto"] },
-        { selector: "mat-card-content", classes: ["rtl-auto"] },
-        { selector: "source-viewer-v2", classes: ["rtl-auto"] },
+export async function getDefaultPosition() {
+  if (!cachedDefaultsConfig) {
+    cachedDefaultsConfig = await getConfigFromBackground("defaults");
+  }
+  return cachedDefaultsConfig.position;
+}
+
+/**
+ * Gets the domains configuration
+ * @returns {Promise<DomainConfig[]>} Array of domain configurations
+ */
+export async function getSupportedDomains() {
+  if (!cachedDomainsConfig) {
+    try {
+      // Get both configurations
+      const [domainsConfig, defaultsConfig] = await Promise.all([
+        getConfigFromBackground("domains"),
+        getConfigFromBackground("defaults"),
+      ]);
+
+      // Cache the results
+      cachedDomainsConfig = [
+        ...domainsConfig,
         {
-          selector: "labs-tailwind-structural-element-view-v2",
-          classes: ["rtl-auto"],
+          domain: "default",
+          position: { ...defaultsConfig.position },
+          selectors: { ...defaultsConfig.selectors },
         },
-        { selector: "query-box", classes: ["rtl-auto"] },
-        { selector: "note-editor", classes: ["rtl-auto"] },
-        { selector: "rich-text-editor", classes: ["rtl-auto"] },
-        { selector: "omnibar", classes: ["rtl-auto"] },
-        { selector: "note-panel", classes: ["rtl-auto"] },
-      ],
-      classes: [
-        { selector: "individual-message", classes: ["rtl-auto"] },
-        { selector: "source-panel-view-content", classes: ["rtl-auto"] },
-        { selector: "source-title", classes: ["rtl-auto"] },
-        { selector: "ql-toolbar", classes: ["rtl-auto"] },
-        { selector: "ql-snow", classes: ["rtl-auto"] },
-        { selector: "note-header__editable-title", classes: ["rtl-auto"] },
-        { selector: "note-panel-content", classes: ["rtl-auto"] },
-        { selector: "note-button-container", classes: ["rtl-auto"] },
-        { selector: "note-button", classes: ["rtl-auto"] },
-        { selector: "note-button-content", classes: ["rtl-auto"] },
-        { selector: "mdc-button__ripple", classes: ["rtl-auto"] },
-        { selector: "mdc-button__label", classes: ["rtl-auto"] },
-        { selector: "note-title", classes: ["rtl-auto"] },
-        { selector: "note-details", classes: ["rtl-auto"] },
-        { selector: "mat-focus-indicator", classes: ["rtl-auto"] },
-        { selector: "mat-mdc-button-touch-target", classes: ["rtl-auto"] },
-        { selector: "mat-ripple", classes: ["rtl-auto"] },
-      ],
-    },
-  },
-  {
-    domain: "^gemini\\.google\\.com$",
-    position: {
-      top: "16px",
-      right: "122px",
-      padding: DEFAULT_POSITION.padding,
-    },
-    selectors: {
-      attributes: [{ selector: "contenteditable", classes: ["rtl-auto"] }],
-      tags: [
-        { selector: "rich-textarea", classes: ["rtl-auto"] },
-        { selector: "mat-form-field", classes: ["rtl-auto"] },
-        { selector: "user-query-content", classes: ["rtl-auto"] },
-        { selector: "model-response", classes: ["rtl-auto"] },
-        { selector: "message-content", classes: ["rtl-auto"] },
-        { selector: "response-element", classes: ["rtl-auto"] },
-      ],
-      classes: [
-        { selector: "individual-message", classes: ["rtl-auto"] },
-        { selector: "new-input-ui", classes: ["rtl-inherit"] },
-        { selector: "ql-editor", classes: ["rtl-auto"] },
-        { selector: "ql-container", classes: ["rtl-auto"] },
-      ],
-    },
-  },
-  {
-    domain: "^(?:[^.]+\\.)?perplexity\\.ai$",
-    position: {
-      top: "18px",
-      right: "36px",
-      padding: DEFAULT_POSITION.padding,
-    },
-    selectors: {
-      attributes: [],
-      tags: [
-        { selector: "textarea", classes: ["rtl-auto"] },
-        { selector: "span.w-full", classes: ["ltr-force"] },
-      ],
-      classes: [
-        { selector: "grid", classes: ["rtl-auto"] },
-        { selector: "flex", classes: ["rtl-auto"] },
-        { selector: "relative", classes: ["rtl-auto"] },
-        { selector: "textarea", classes: ["rtl-auto"] },
-      ],
-    },
-  },
-  {
-    domain: "^(?:[^.]+\\.)?chatgpt\\.com$",
-    position: {
-      top: "8px",
-      right: "195px",
-      padding: DEFAULT_POSITION.padding,
-    },
-    selectors: {
-      attributes: [{ selector: "contenteditable", classes: ["rtl-auto"] }],
-      tags: [{ selector: "math", classes: ["ltr-force"] }],
-      classes: [
-        { selector: "katex", classes: ["ltr-force"] },
-        { selector: "katex-mathml", classes: ["ltr-force"] },
-        { selector: "katex-html", classes: ["ltr-force"] },
-      ],
-    },
-  },
-  {
-    domain: "default",
-    position: { ...DEFAULT_POSITION },
-    selectors: { ...DEFAULT_SELECTORS },
-  },
-];
+      ];
+    } catch (error) {
+      debugLog("Error loading domain configurations:", error);
+      throw error;
+    }
+  }
+
+  return cachedDomainsConfig;
+}
 
 /**
  * Gets the domain configuration for the current domain
- * @returns {DomainConfig} Configuration for the current domain or default
+ * @returns {Promise<DomainConfig>} Configuration for the current domain or default
  */
-export function getCurrentDomainConfig() {
+export async function getCurrentDomainConfig() {
+  const domains = await getSupportedDomains();
   const currentDomain = window.location.hostname;
+
   return (
-    SUPPORTED_DOMAINS.find(
+    domains.find(
       (config) =>
         config.domain !== "default" &&
         new RegExp(config.domain).test(currentDomain)
-    ) || SUPPORTED_DOMAINS.find((config) => config.domain === "default")
+    ) || domains.find((config) => config.domain === "default")
   );
 }
 
 /**
  * Checks if a domain is supported by the extension
  * @param {string} hostname - The hostname to check
- * @returns {boolean} Whether the domain is supported
+ * @returns {Promise<boolean>} Whether the domain is supported
  */
-export function isDomainSupported(hostname) {
-  return SUPPORTED_DOMAINS.some(
+export async function isDomainSupported(hostname) {
+  const domains = await getSupportedDomains();
+
+  return domains.some(
     (config) =>
       config.domain !== "default" && new RegExp(config.domain).test(hostname)
   );
 }
 
-// Re-export selectors.js functions for convenience
-export { createElementSelector, getClassesForElement };
+/**
+ * Creates a combined CSS selector string for all configured elements
+ * @param {SelectorsConfig} selectors - Configuration for element selection
+ * @returns {string} Combined CSS selector targeting all relevant elements
+ */
+export function createElementSelector(selectors) {
+  return [
+    ...selectors.attributes.map(({ selector }) => `[${selector}]`),
+    ...selectors.tags.map(({ selector }) => selector),
+    ...selectors.classes.map(({ selector }) => `.${selector}`),
+  ].join(",");
+}
+
+/**
+ * Determines which RTL classes should be applied to a given element
+ * @param {HTMLElement} element - The DOM element to check
+ * @param {SelectorsConfig} selectors - Configuration for element selection
+ * @returns {string[]} Array of RTL class names to apply
+ */
+export function getClassesForElement(element, selectors) {
+  let classes = [];
+
+  // Check for matching attributes
+  selectors.attributes.forEach(({ selector, classes: selectorClasses }) => {
+    if (element.hasAttribute(selector)) {
+      classes = classes.concat(selectorClasses);
+    }
+  });
+
+  // Check for matching tags
+  selectors.tags.forEach(({ selector, classes: selectorClasses }) => {
+    if (element.tagName.toLowerCase() === selector) {
+      classes = classes.concat(selectorClasses);
+    }
+  });
+
+  // Check for matching classes
+  selectors.classes.forEach(({ selector, classes: selectorClasses }) => {
+    if (element.classList.contains(selector)) {
+      classes = classes.concat(selectorClasses);
+    }
+  });
+
+  // Remove duplicates and return
+  return [...new Set(classes)];
+}

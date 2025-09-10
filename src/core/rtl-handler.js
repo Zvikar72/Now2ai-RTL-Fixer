@@ -2,12 +2,26 @@
  * @fileoverview Core RTL text handling functionality
  * Provides the main logic for applying and managing RTL text direction
  */
-
-import { CSS_CLASSES } from "../config/constants.js";
+import { debugLog } from "../utils/utils.js";
+import { getConfigFromBackground } from "../utils/config-utils.js";
 import {
   getCurrentDomainConfig,
   getClassesForElement,
 } from "../config/domains.js";
+
+// Cache for styles config
+let cachedStylesConfig = null;
+
+/**
+ * Gets the styles configuration
+ * @returns {Promise<Object>} Styles configuration
+ */
+async function getStylesConfig() {
+  if (!cachedStylesConfig) {
+    cachedStylesConfig = await getConfigFromBackground("styles");
+  }
+  return cachedStylesConfig;
+}
 
 /**
  * @typedef {WeakMap<Element, Set<string>>} ProcessedElementsMap
@@ -24,22 +38,24 @@ const processedElements = new WeakMap();
 /**
  * Applies RTL-related CSS properties and attributes to a DOM element
  * @param {HTMLElement} element - The element to process
- * @param {string[]} classNames - Array of RTL class names to apply
  * @throws {Error} If element is invalid or classes don't exist
  */
-export function applyRTLStyles(element) {
+export async function applyRTLStyles(element) {
   // Skip if already processed
   if (processedElements.has(element)) {
     return;
   }
 
-  const domainConfig = getCurrentDomainConfig();
+  const domainConfig = await getCurrentDomainConfig();
   const classNames = getClassesForElement(element, domainConfig.selectors);
   if (!classNames.length) {
     return;
   }
 
   try {
+    // Get the CSS classes configuration
+    const cssClasses = await getStylesConfig();
+
     // First, clear any existing inline direction styles that might conflict
     // This ensures our styles take precedence
     const directionProps = ["direction", "unicode-bidi"];
@@ -49,8 +65,8 @@ export function applyRTLStyles(element) {
       }
     });
 
-    classNames.forEach((className) => {
-      const rules = CSS_CLASSES[className]?.cssRules;
+    for (const className of classNames) {
+      const rules = cssClasses[className]?.cssRules;
       if (!rules) {
         throw new Error(`Invalid RTL class name: ${className}`);
       }
@@ -65,12 +81,12 @@ export function applyRTLStyles(element) {
           element.style.setProperty(prop, cleanValue, "important");
         }
       });
-    });
+    }
 
     // Mark as processed
     processedElements.set(element, new Set(classNames));
   } catch (error) {
-    console.error("Error applying RTL styles:", error);
+    debugLog("Error applying RTL styles:", error);
     throw error;
   }
 }
@@ -95,7 +111,7 @@ export function removeRTLStyles(element) {
     processedElements.delete(element);
     return true;
   } catch (error) {
-    console.error("Error removing RTL styles:", error);
+    debugLog("Error removing RTL styles:", error);
     throw error;
   }
 }
